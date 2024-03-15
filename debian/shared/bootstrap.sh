@@ -67,7 +67,7 @@ systemctl enable kubelet
 
 echo "[TASK 10] Update /etc/hosts file"
 cat >>/etc/hosts<<EOF
-192.168.121.250   control-plane.example.com    control-plane
+192.168.121.250   controlplane.example.com    controlplane
 192.168.121.251   node001.example.com    node001
 192.168.121.252   node002.example.com    node002
 EOF
