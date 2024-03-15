@@ -1,0 +1,69 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+ENV['VAGRANT_NO_PARALLEL'] = 'yes'
+ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'
+
+VAGRANT_BOX           = "generic/debian12"
+CPUS_CONTROL_PLANE    = 2
+CPUS_NODE             = 2
+MEMORY_CONTROL_PLANE  = 2148
+MEMORY_NODE           = 2148
+NODES_COUNT           = 2
+
+Vagrant.configure(2) do |config|
+
+  config.vm.provider :libvirt do |libvirt|
+       libvirt.uri = "qemu:///system"
+       libvirt.management_network_name = "k8s"
+       libvirt.management_network_address = "192.168.121.0/24"
+       libvirt.memorybacking :access, :mode => "shared"
+  end
+
+  config.ssh.insert_key = false
+  config.ssh.private_key_path = ["~/.ssh/vagrant-ssh-key","~/.vagrant.d/insecure_private_key"]
+  config.vm.provision "file", source: "~/.ssh/vagrant-ssh-key.pub", destination: "~/.ssh/authorized_keys"
+  config.vm.synced_folder "./shared", "/opt/vagrant/data", type: "virtiofs"
+  config.vm.provision "shell", path: "./shared/bootstrap.sh"
+
+  # Kubernetes Control Plane Server
+  config.vm.define "controlplane" do |node|
+
+    node.vm.box               = VAGRANT_BOX
+    node.vm.hostname          = "control-plane.example.com"
+
+    node.vm.network "private_network", ip: "192.168.121.250"
+
+    node.vm.provider :libvirt do |domain|
+      domain.host    = "controlplane"
+      domain.memory  = MEMORY_CONTROL_PLANE
+      domain.cpus    = CPUS_CONTROL_PLANE
+    end
+
+    node.vm.provision "shell", path: "./shared/bootstrap_control_plane.sh"
+
+  end
+
+  # Kubernetes Worker Nodes
+  (1..NODES_COUNT).each do |i|
+
+    config.vm.define "node00#{i}" do |node|
+
+      node.vm.box               = VAGRANT_BOX
+      node.vm.hostname          = "node00#{i}.example.com"
+
+      node.vm.network "private_network", ip: "192.168.121.25#{i}"
+
+      node.vm.provider :libvirt do |domain|
+        domain.host    = "node00#{i}"
+        domain.memory  = MEMORY_NODE
+        domain.cpus    = CPUS_NODE
+      end
+
+      node.vm.provision "shell", path: "./shared/bootstrap_worker_nodes.sh"
+
+    end
+
+  end
+
+end
